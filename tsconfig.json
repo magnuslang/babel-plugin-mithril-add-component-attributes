@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
-    "module": "esnext",
-    "target": "esnext",
+    "module": "es2015",
+    "target": "es2015",
     "moduleResolution": "Node",
     "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,

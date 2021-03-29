@@ -113,16 +113,16 @@ export default function babelPluginMithrilComponentDataAttrs({ types: t }: Types
   };
 
   const returnStatementVisitor: Visitor<{ name: string; source: NodePath }> = {
-    ReturnStatement(path, { name, source }) {
+    ReturnStatement(path, state) {
       const arg = path.get("argument");
       if (arg.isIdentifier()) {
         const binding = path.scope.getBinding(arg.node.name);
         if (binding == null) {
           return;
         }
-        binding.path.traverse(functionVisitor, { name, source });
+        binding.path.traverse(functionVisitor, state);
       } else {
-        path.traverse(functionVisitor, { name, source: path });
+        path.traverse(functionVisitor, { ...state, source: path });
       }
     },
   };
@@ -165,13 +165,15 @@ export default function babelPluginMithrilComponentDataAttrs({ types: t }: Types
     ArrowFunctionExpression: (path, state) => {
       const name = nameForComponent(path, state.file);
 
-      if (!path.get("body").isBlockStatement()) {
-        path.traverse(functionVisitor, { name, source: path, ...state });
+      const isBlock = path.get("body").isBlockStatement();
+
+      if (!isBlock) {
+        path.traverse(functionVisitor, { name, source: path, file: state.file });
       } else {
         path.traverse(returnStatementVisitor, {
           name,
           source: path,
-          ...state,
+          file: state.file,
         });
       }
     },
@@ -211,3 +213,7 @@ export const testTransform = (code: string, pluginOptions = {}, transformOptions
 
   return result.code?.trim() || "";
 };
+
+const test = testTransform("const MyComponent = () => m('div');");
+
+test;
