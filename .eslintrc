@@ -1,0 +1,78 @@
+{
+  "extends": [
+    "eslint:recommended",
+    "plugin:import/errors",
+    "plugin:import/warnings",
+    "plugin:import/typescript",
+    "prettier"
+  ],
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "ecmaVersion": 2021,
+    "sourceType": "module"
+  },
+  "plugins": ["unicorn"],
+  "rules": {
+    "unicorn/consistent-function-scoping": "error",
+    "unicorn/explicit-length-check": "error",
+    "unicorn/no-array-instanceof": "error",
+    "unicorn/prefer-array-find": "error",
+    "unicorn/prefer-event-key": "error",
+    "unicorn/prefer-includes": "error",
+    "unicorn/prefer-string-slice": "error",
+    "semi": ["error", "always"],
+    "no-unused-vars": ["warn", { "varsIgnorePattern": "^_", "argsIgnorePattern": "^_", "ignoreRestSiblings": true }],
+    "no-console": "warn",
+    "import/order": [
+      "error",
+      {
+        "groups": ["builtin", "external", "internal", "parent", "sibling", "index"],
+        "pathGroups": [
+          {
+            "pattern": "~/**",
+            "group": "internal"
+          }
+        ],
+        "alphabetize": {
+          "order": "asc",
+          "caseInsensitive": true
+        }
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": "**/*.ts",
+      "extends": ["plugin:@typescript-eslint/recommended", "prettier"],
+      "rules": {
+        "@typescript-eslint/explicit-module-boundary-types": 0,
+        "@typescript-eslint/no-explicit-any": 0,
+        "@typescript-eslint/no-empty-function": 0,
+        "@typescript-eslint/no-unused-vars": [
+          "warn",
+          { "varsIgnorePattern": "^_", "argsIgnorePattern": "^_", "ignoreRestSiblings": true }
+        ],
+        "import/namespace": 0
+      }
+    },
+    {
+      "files": "src/**/*.tests.{ts,js}",
+      "env": { "jest": true },
+      "rules": { "unicorn/consistent-function-scoping": 0 }
+    }
+  ],
+  "env": {
+    "commonjs": true,
+    "node": true,
+    "es6": true
+  },
+  "settings": {
+    "import/extensions": [".js", ".ts"],
+    "import/parsers": {
+      "@typescript-eslint/parser": [".js", ".ts"]
+    },
+    "import/resolver": {
+      "typescript": {}
+    }
+  }
+}

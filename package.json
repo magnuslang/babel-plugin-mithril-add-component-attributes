@@ -1,0 +1,72 @@
+{
+  "name": "babel-plugin-mithril-add-data-attribute",
+  "version": "1.0.0",
+  "description": "Babel plugin adds attributes to m() components - intended for development. Helps debug - find your components in a large repo. Adds component name and file to component data attributes which will be visible in the generated HTML.",
+  "main": "index.js",
+  "author": "Magnus Lång <magnuslang@gmail.com>",
+  "license": "MIT",
+  "scripts": {
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc",
+    "test": "jest",
+    "test:watch": "yarn run test -- --watch",
+    "check": "yarn run lint && yarn run test",
+    "build": "babel -x 'js' -x '.ts' src --out-dir lib",
+    "prepublish": "in-publish && yarn run build || :",
+    "prettier": "prettier --write --loglevel=warn src"
+  },
+  "files": [
+    "README.md",
+    "index.js",
+    "lib"
+  ],
+  "babel": {
+    "presets": [
+      [
+        "@babel/preset-env",
+        {
+          "targets": {
+            "node": "current"
+          }
+        }
+      ],
+      "@babel/preset-typescript"
+    ],
+    "plugins": [
+      "@babel/plugin-transform-typescript"
+    ]
+  },
+  "jest": {
+    "testRegex": "[\\w+]\\.test\\.ts$"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.13.10",
+    "@babel/core": "^7.13.10",
+    "@babel/preset-env": "^7.13.10",
+    "@babel/preset-typescript": "^7.13.0",
+    "@types/babel-core": "^6.25.6",
+    "@types/babel-traverse": "^6.25.5",
+    "@types/jest": "^26.0.22",
+    "@types/node": "^14.14.35",
+    "@typescript-eslint/eslint-plugin": "^4.19.0",
+    "@typescript-eslint/parser": "^4.19.0",
+    "babel-jest": "^20.0.3",
+    "eslint": "^7.23.0",
+    "eslint-config-prettier": "^8.1.0",
+    "eslint-import-resolver-typescript": "^2.4.0",
+    "eslint-plugin-import": "^2.22.1",
+    "eslint-plugin-unicorn": "^29.0.0",
+    "in-publish": "^2.0.0",
+    "jest": "^26.6.3",
+    "prettier": "^2.2.1",
+    "typescript": "^4.2.3"
+  },
+  "prettier": {
+    "singleQuote": false,
+    "printWidth": 120,
+    "trailingComma": "es5",
+    "bracketSpacing": true,
+    "tabWidth": 2,
+    "arrowParens": "always"
+  }
+}
