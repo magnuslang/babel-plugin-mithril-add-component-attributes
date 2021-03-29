@@ -72,6 +72,46 @@ export default function babelPluginMithrilComponentDataAttrs({ types: t }: Types
     return details.name === "index" ? details.directory : details.name;
   }
 
+  const programVisitor: Visitor = {
+    VariableDeclarator: (path, state) => {
+      const name = nameForComponent(path, state.file);
+
+      const init = path.get("init") as NodePath;
+
+      if (t.isBlock(init)) {
+        init.traverse(blockStatementVisitor, {
+          name,
+          source: path,
+          ...state,
+        });
+        return;
+      }
+
+      path.traverse(functionVisitor, { name, source: path, ...state });
+    },
+    FunctionExpression: (path, state) => {
+      const name = nameForComponent(path, state.file);
+      path.traverse(functionVisitor, { name, source: path, ...state });
+    },
+    FunctionDeclaration: (path, state) => {
+      const name = nameForComponent(path, state.file);
+
+      if (!process) {
+        return;
+      }
+
+      if (path.get("body").isBlockStatement()) {
+        path.traverse(returnStatementVisitor, {
+          name,
+          source: path,
+          ...state,
+        });
+      } else {
+        path.traverse(functionVisitor, { name, source: path, ...state });
+      }
+    },
+  };
+
   const returnStatementVisitor: Visitor<{ name: string; source: NodePath }> = {
     ReturnStatement(path, { name, source }) {
       const arg = path.get("argument");
@@ -142,45 +182,6 @@ export default function babelPluginMithrilComponentDataAttrs({ types: t }: Types
       const props = path.get("key");
       if (props.isIdentifier() && props.node.name === "view") {
         path.traverse(returnStatementVisitor, state);
-      }
-    },
-  };
-
-  const programVisitor: Visitor = {
-    VariableDeclarator: (path, state) => {
-      const name = nameForComponent(path, state.file);
-
-      const init = path.get("init") as NodePath;
-
-      if (t.isBlock(init)) {
-        init.traverse(blockStatementVisitor, {
-          name,
-          source: path,
-        });
-        return;
-      }
-
-      path.traverse(functionVisitor, { name, source: path, ...state });
-    },
-    FunctionExpression: (path, state) => {
-      const name = nameForComponent(path, state.file);
-      path.traverse(functionVisitor, { name, source: path, ...state });
-    },
-    FunctionDeclaration: (path, state) => {
-      const name = nameForComponent(path, state.file);
-
-      if (!process) {
-        return;
-      }
-
-      if (path.get("body").isBlockStatement()) {
-        path.traverse(returnStatementVisitor, {
-          name,
-          source: path,
-          ...state,
-        });
-      } else {
-        path.traverse(functionVisitor, { name, source: path, ...state });
       }
     },
   };
