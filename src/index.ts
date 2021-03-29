@@ -1,7 +1,6 @@
 import { extname, basename, dirname } from "path";
 
-import { TransformOptions, transform, Visitor } from "babel-core";
-import { NodePath } from "babel-traverse";
+import { NodePath, Visitor } from "babel-traverse";
 import * as types from "babel-types";
 
 const DATA_ATTRIBUTE = "data-component";
@@ -197,23 +196,3 @@ export default function babelPluginMithrilComponentDataAttrs({ types: t }: Types
     },
   };
 }
-
-// used for test and development
-export const testTransform = (code: string, pluginOptions = {}, transformOptions: TransformOptions = {}): string => {
-  if (!code) {
-    return "";
-  }
-
-  const result = transform(code, {
-    babelrc: false,
-    plugins: [babelPluginMithrilComponentDataAttrs, pluginOptions],
-    parserOpts: { plugins: [] },
-    ...transformOptions,
-  });
-
-  return result.code?.trim() || "";
-};
-
-const test = testTransform("const MyComponent = () => m('div');");
-
-test;

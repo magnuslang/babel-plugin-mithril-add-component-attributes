@@ -1,4 +1,22 @@
-import { testTransform } from "../src";
+import { TransformOptions, transform } from "babel-core";
+
+import babelPluginMithrilComponentDataAttrs from "../src";
+
+// used for tests and development
+export const testTransform = (code: string, pluginOptions = {}, transformOptions: TransformOptions = {}): string => {
+  if (!code) {
+    return "";
+  }
+
+  const result = transform(code, {
+    babelrc: false,
+    plugins: [babelPluginMithrilComponentDataAttrs, pluginOptions],
+    parserOpts: { plugins: [] },
+    ...transformOptions,
+  });
+
+  return result.code?.trim() || "";
+};
 
 describe("inputs attributes in options object or creates one", () => {
   it("converts m with only 1 arg", () => {
