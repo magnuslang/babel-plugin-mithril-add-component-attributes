@@ -6,10 +6,14 @@ import * as types from "babel-types";
 
 const DATA_ATTRIBUTE = "data-component";
 
-interface FileOpts {
-  opts: { filename: string };
+interface FileParams {
+  directory: string;
+  name: string;
 }
 
+interface FileOpts {
+  opts?: { filename?: string };
+}
 interface Plugin {
   visitor: Visitor;
   name: string;
@@ -19,7 +23,12 @@ interface Types {
   types: typeof types;
 }
 
-const fileDetails = ({ opts: { filename } }: FileOpts) => {
+const fileDetails = (file: FileOpts): FileParams | null => {
+  if (!file?.opts?.filename) {
+    return null;
+  }
+  const { filename } = file.opts;
+
   if (filename === "unknown" || filename == null) {
     return null;
   }
@@ -55,6 +64,7 @@ export default function babelPluginMithrilComponentDataAttrs({ types: t }: Types
     }
 
     const details = fileDetails(file);
+
     if (details == null) {
       return "no details";
     }
@@ -103,7 +113,7 @@ export default function babelPluginMithrilComponentDataAttrs({ types: t }: Types
       }
 
       const hasDataAttribute = secondArgument.node.properties.some(
-        (property) => !t.isSpreadProperty(property) && t.isStringLiteral(property.key, { value: DATA_ATTRIBUTE })
+        (property) => t.isObjectMember(property) && t.isStringLiteral(property.key, { value: DATA_ATTRIBUTE })
       );
       if (hasDataAttribute) {
         // do nothing if attr already exists
@@ -116,11 +126,12 @@ export default function babelPluginMithrilComponentDataAttrs({ types: t }: Types
       const name = nameForComponent(path, state.file);
 
       if (!path.get("body").isBlockStatement()) {
-        path.traverse(functionVisitor, { name, source: path });
+        path.traverse(functionVisitor, { name, source: path, ...state });
       } else {
         path.traverse(returnStatementVisitor, {
           name,
           source: path,
+          ...state,
         });
       }
     },
@@ -149,11 +160,11 @@ export default function babelPluginMithrilComponentDataAttrs({ types: t }: Types
         return;
       }
 
-      path.traverse(functionVisitor, { name, source: path });
+      path.traverse(functionVisitor, { name, source: path, ...state });
     },
     FunctionExpression: (path, state) => {
       const name = nameForComponent(path, state.file);
-      path.traverse(functionVisitor, { name, source: path });
+      path.traverse(functionVisitor, { name, source: path, ...state });
     },
     FunctionDeclaration: (path, state) => {
       const name = nameForComponent(path, state.file);
@@ -166,9 +177,10 @@ export default function babelPluginMithrilComponentDataAttrs({ types: t }: Types
         path.traverse(returnStatementVisitor, {
           name,
           source: path,
+          ...state,
         });
       } else {
-        path.traverse(functionVisitor, { name, source: path });
+        path.traverse(functionVisitor, { name, source: path, ...state });
       }
     },
   };
