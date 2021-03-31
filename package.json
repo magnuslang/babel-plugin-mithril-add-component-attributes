@@ -12,36 +12,21 @@
     "test:watch": "yarn run test -- --watch",
     "check": "yarn run lint && yarn run test",
     "build": "babel -x 'js' -x '.ts' src --out-dir lib",
-    "prepublish": "in-publish && yarn run build || :",
-    "prettier": "prettier --write --loglevel=warn src"
+    "prepublish": "in-publish && yarn run build || :"
   },
   "files": [
     "README.md",
     "index.js",
     "lib"
   ],
-  "babel": {
-    "presets": [
-      [
-        "@babel/preset-env",
-        {
-          "targets": {
-            "node": "current"
-          }
-        }
-      ],
-      "@babel/preset-typescript"
-    ],
-    "plugins": [
-      "@babel/plugin-transform-typescript"
-    ]
-  },
   "jest": {
     "testRegex": "[\\w+]\\.test\\.ts$"
   },
+  "dependencies": {
+    "@babel/core": "^7.13.10"
+  },
   "devDependencies": {
     "@babel/cli": "^7.13.10",
-    "@babel/core": "^7.13.10",
     "@babel/preset-env": "^7.13.10",
     "@babel/preset-typescript": "^7.13.0",
     "@types/babel-core": "^6.25.6",
@@ -60,13 +45,5 @@
     "jest": "^26.6.3",
     "prettier": "^2.2.1",
     "typescript": "^4.2.3"
-  },
-  "prettier": {
-    "singleQuote": false,
-    "printWidth": 120,
-    "trailingComma": "es5",
-    "bracketSpacing": true,
-    "tabWidth": 2,
-    "arrowParens": "always"
   }
 }

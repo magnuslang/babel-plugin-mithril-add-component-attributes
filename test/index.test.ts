@@ -1,48 +1,63 @@
 import { resolve } from "path";
 import { testTransform } from "../src";
 
+const unstringSnapshotSerializer = {
+  test: (val) => typeof val === "string",
+  print: (val) => val,
+};
+
+if (typeof expect !== "undefined" && expect.addSnapshotSerializer) {
+  expect.addSnapshotSerializer(unstringSnapshotSerializer);
+}
+
 describe("inputs attributes in options object or creates one", () => {
   it("converts m with only 1 arg", () => {
     expect(
-      testTransform(
-        `const component = m('div');
-        `
-      )
+      testTransform(`
+    const MyComponent = m("div");
+    `)
     ).toMatchInlineSnapshot(`
-        "const component = m('div', {
-                'data-component': 'component'
-        });"
-      `);
+      const MyComponent = m("div", {
+        "data-component": "MyComponent"
+      });
+    `);
   });
+
   it("converts m with 2 args, no options", () => {
     expect(
       testTransform(`
-          const component = m('div', 'text');
+          const MyComponent = m("div", "text");
         `)
     ).toMatchInlineSnapshot(`
-        "const component = m('div', {
-                  'data-component': 'component'
-        }, 'text');"
+      const MyComponent = m("div", {
+        "data-component": "MyComponent"
+      }, "text");
     `);
   });
 
   it("converts m with options arg, no data-attribute", () => {
     expect(
       testTransform(`
-              const component = m('div', { class: 'btn'}, 'text');
+              const MyComponent = m("div", { class: "btn"}, "text");
       `)
     ).toMatchInlineSnapshot(`
-        "const component = m('div', { class: 'btn', 'data-component': 'component'
-        }, 'text');"
-      `);
+      const MyComponent = m("div", {
+        class: "btn",
+        "data-component": "MyComponent"
+      }, "text");
+    `);
   });
 
   it("does not overwrite m with existing data-attribute", () => {
     expect(
       testTransform(`
-      const component = m('div', { 'data-component': 'roffe'}, 'text');
+      const MyComponent = m("div", { "data-component": "roffe"}, "text");
         `)
-    ).toMatchInlineSnapshot(`"const component = m('div', { 'data-component': 'roffe' }, 'text');"`);
+    ).toMatchInlineSnapshot(`
+      const MyComponent = m("div", {
+        "data-component": "roffe"
+      }, "text");
+    `);
   });
 });
 
@@ -50,12 +65,12 @@ describe("arrow expressions", () => {
   it("handles non-block statement arrow expressions", () => {
     expect(
       testTransform(`
-      const MyComponent = () => m('div');
+      const MyComponent = () => m("div");
     `)
     ).toMatchInlineSnapshot(`
-      "const MyComponent = () => m('div', {
-            'data-component': 'MyComponent'
-      });"
+      const MyComponent = () => m("div", {
+        "data-component": "MyComponent"
+      });
     `);
   });
 
@@ -64,40 +79,41 @@ describe("arrow expressions", () => {
       testTransform(`
       const MyComponent = () => {
         if (true) {
-          return m('div');
+          return m("div");
         } else {
-          return m('span', 'nope');
+          return m("span", "nope");
         }
       }
     `)
     ).toMatchInlineSnapshot(`
-      "const MyComponent = () => {
+      const MyComponent = () => {
         if (true) {
-          return m('div', {
-            'data-component': 'MyComponent'
+          return m("div", {
+            "data-component": "MyComponent"
           });
         } else {
-          return m('span', {
-            'data-component': 'MyComponent'
-          }, 'nope');
+          return m("span", {
+            "data-component": "MyComponent"
+          }, "nope");
         }
-      };"
+      };
     `);
 
     expect(
       testTransform(`
       const Comp2 = {};
       const MyComponent = () => {
-          return m('div', m(Comp2));
+          return m("div", m(Comp2));
       }
     `)
     ).toMatchInlineSnapshot(`
-      "const Comp2 = {};
+      const Comp2 = {};
+
       const MyComponent = () => {
-          return m('div', {
-              'data-component': 'MyComponent'
-          }, m(Comp2));
-      };"
+        return m("div", {
+          "data-component": "MyComponent"
+        }, m(Comp2));
+      };
     `);
   });
 });
@@ -112,46 +128,46 @@ describe("function expressions", () => {
       }
     `)
     ).toMatchInlineSnapshot(`
-      "function MyComponent() {
+      function MyComponent() {
         const markup = null;
         return markup;
-      }"
+      }
     `);
 
     expect(
       testTransform(`
       function MyComponent() {
-        const markup = m('div', {});
+        const markup = m("div", {});
         return markup;
       }
     `)
     ).toMatchInlineSnapshot(`
-      "function MyComponent() {
-        const markup = m('div', {
-          'data-component': 'markup'
+      function MyComponent() {
+        const markup = m("div", {
+          "data-component": "markup"
         });
         return markup;
-      }"
+      }
     `);
   });
 
-  it("processes nested-function components", () => {
+  it("processes nested function components", () => {
     expect(
       testTransform(`
       if (true) {
         function MyComponent() {
-          return m('div');
+          return m("div");
         }
       }
     `)
     ).toMatchInlineSnapshot(`
-      "if (true) {
+      if (true) {
         function MyComponent() {
-          return m('div', {
-            'data-component': 'MyComponent'
+          return m("div", {
+            "data-component": "MyComponent"
           });
         }
-      }"
+      }
     `);
   });
 
@@ -159,15 +175,14 @@ describe("function expressions", () => {
     expect(
       testTransform(`
         const MyComponent = function() {
-          return m('div');
+          return m("div");
         }
       `)
     ).toMatchInlineSnapshot(`
-      "const MyComponent = function () {
-        return m('div', {
-          'data-component': 'MyComponent'
-        });
-      };"
+      const MyComponent = function () {
+        return m("div",
+          "data-component": "MyComponent");
+      };
     `);
   });
 });
@@ -178,15 +193,15 @@ describe("function expressions", () => {
 //       testTransform(`
 //         const MyComponent = class extends Roffe {
 //           view() {
-//             return m('div');
+//             return m("div");
 //           }
 //         }
 //       `)
 //     ).toMatchInlineSnapshot(`
 //       "const MyComponent = class extends Roffe {
 //         view() {
-//           return m('div', {
-//             'data-component': 'MyComponent'
+//           return m("div", {
+//             "data-component": "MyComponent"
 //           });
 //         }
 //       };"
@@ -203,7 +218,7 @@ describe("uses filename ass fallback", () => {
         `
       export default class extends m.Component {
         view() {
-          return m('div');
+          return m("div");
         }
       }
     `,
@@ -211,49 +226,50 @@ describe("uses filename ass fallback", () => {
         { filename }
       )
     ).toMatchInlineSnapshot(`
-      "export default class extends m.Component {
+      export default class extends m.Component {
         view() {
-          return m('div', {
-            'data-component': 'MyComponent'
-          });
+          return m("div",
+            "data-component": "MyComponent.js"
+          );
         }
-      }"
+
+      }
     `);
 
     expect(
       testTransform(
         `
       export default function() {
-        return m('div');
+        return m("div");
       }
     `,
         {},
         { filename }
       )
     ).toMatchInlineSnapshot(`
-      "export default function () {
-        return m('div', {
-          'data-component': 'MyComponent'
+      export default function () {
+        return m("div", {
+          "data-component": "MyComponent.js"
         });
-      }"
+      }
     `);
 
     expect(
       testTransform(
         `
       export default () => {
-        return m('div');
+        return m("div");
       }
     `,
         {},
         { filename }
       )
     ).toMatchInlineSnapshot(`
-      "export default (() => {
-        return m('div', {
-          'data-component': 'MyComponent'
-        });
-      });"
+      export default (() => {
+        return m("div",
+          "data-component": "MyComponent.js"
+        );
+      });
     `);
   });
 
@@ -265,7 +281,7 @@ describe("uses filename ass fallback", () => {
         `
       export default class extends m.Component {
         view() {
-          return m('div');
+          return m("div");
         }
       }
     `,
@@ -273,74 +289,48 @@ describe("uses filename ass fallback", () => {
         { filename }
       )
     ).toMatchInlineSnapshot(`
-      "export default class extends m.Component {
+      export default class extends m.Component {
         view() {
-          return m('div', {
-            'data-component': 'MyComponent'
-          });
+          return m("div",
+            "data-component": "MyComponent"
+          );
         }
-      }"
+
+      }
     `);
 
     expect(
       testTransform(
         `
       export default function() {
-        return m('div');
+        return m("div");
       }
     `,
         {},
         { filename }
       )
     ).toMatchInlineSnapshot(`
-      "export default function () {
-        return m('div', {
-          'data-component': 'MyComponent'
+      export default function () {
+        return m("div", {
+          "data-component": "MyComponent"
         });
-      }"
+      }
     `);
 
     expect(
       testTransform(
         `
       export default () => {
-        return m('div');
+        return m("div");
       }
     `,
         {},
         { filename }
       )
     ).toMatchInlineSnapshot(`
-      "export default (() => {
-        return m('div', {
-          'data-component': 'MyComponent'
-        });
-      });"
+      export default (() => {
+        return m("div");
+      });
     `);
-  });
-});
-
-describe("options", () => {
-  describe("name", () => {
-    it("uses the custom name", () => {
-      expect(
-        testTransform(
-          `
-        class MyComponent extends m.Component {
-          view() {
-            return m('div');
-          }
-        }
-      `,
-          {
-            overrides: {
-              MyComponent: {
-                name: "SomeOtherComponent",
-              },
-            },
-          }
-        )
-      ).toMatchSnapshot();
-    });
   });
 });

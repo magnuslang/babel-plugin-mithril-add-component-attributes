@@ -1,7 +1,7 @@
 import { extname, basename, dirname } from "path";
 
-import { TransformOptions, transform, Visitor } from "babel-core";
-import { NodePath } from "babel-traverse";
+import { TransformOptions, transform } from "@babel/core";
+import { NodePath, Visitor } from "babel-traverse";
 import * as types from "babel-types";
 
 const DATA_ATTRIBUTE = "data-component";
@@ -38,14 +38,22 @@ const fileDetails = (file: FileOpts): FileParams | null => {
   };
 };
 
-export default function babelPluginMithrilComponentDataAttrs({ types: t }: Types): Plugin {
+export default function babelPluginMithrilComponentDataAttrs({
+  types: t,
+}: Types): Plugin {
   function createObjectProperties(name: string): types.ObjectProperty {
-    return t.objectProperty(t.stringLiteral(DATA_ATTRIBUTE), t.stringLiteral(name));
+    return t.objectProperty(
+      t.stringLiteral(DATA_ATTRIBUTE),
+      t.stringLiteral(name)
+    );
   }
 
   function nameForComponent(
     path: NodePath<
-      types.FunctionDeclaration | types.ArrowFunctionExpression | types.VariableDeclarator | types.FunctionExpression
+      | types.FunctionDeclaration
+      | types.ArrowFunctionExpression
+      | types.VariableDeclarator
+      | types.FunctionExpression
     >,
     file: FileOpts
   ): string {
@@ -153,7 +161,9 @@ export default function babelPluginMithrilComponentDataAttrs({ types: t }: Types
       }
 
       const hasDataAttribute = secondArgument.node.properties.some(
-        (property) => t.isObjectMember(property) && t.isStringLiteral(property.key, { value: DATA_ATTRIBUTE })
+        (property) =>
+          t.isObjectMember(property) &&
+          t.isStringLiteral(property.key, { value: DATA_ATTRIBUTE })
       );
       if (hasDataAttribute) {
         // do nothing if attr already exists
@@ -168,7 +178,11 @@ export default function babelPluginMithrilComponentDataAttrs({ types: t }: Types
       const isBlock = path.get("body").isBlockStatement();
 
       if (!isBlock) {
-        path.traverse(functionVisitor, { name, source: path, file: state.file });
+        path.traverse(functionVisitor, {
+          name,
+          source: path,
+          file: state.file,
+        });
       } else {
         path.traverse(returnStatementVisitor, {
           name,
@@ -199,21 +213,30 @@ export default function babelPluginMithrilComponentDataAttrs({ types: t }: Types
 }
 
 // used for test and development
-export const testTransform = (code: string, pluginOptions = {}, transformOptions: TransformOptions = {}): string => {
+export const testTransform = (
+  code: string,
+  pluginOptions = {},
+  transformOptions: TransformOptions = {}
+) => {
   if (!code) {
     return "";
   }
 
   const result = transform(code, {
-    babelrc: false,
     plugins: [babelPluginMithrilComponentDataAttrs, pluginOptions],
-    parserOpts: { plugins: [] },
-    ...transformOptions,
+    babelrc: true,
   });
 
-  return result.code?.trim() || "";
+  return result?.code || "";
 };
 
-const test = testTransform("const MyComponent = () => m('div');");
+const test = testTransform(
+  `
+  const MyComponent = function() {
+    return m("div");
+  }
+`
+);
+
 
 test;
