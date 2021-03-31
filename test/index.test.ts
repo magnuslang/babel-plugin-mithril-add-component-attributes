@@ -116,6 +116,22 @@ describe("arrow expressions", () => {
       };
     `);
   });
+
+  it("converts comp as object with view prop arrow func", () => {
+    expect(
+      testTransform(
+        `
+        const MyComponent = { view: () => m("div") }
+        `
+      )
+    ).toMatchInlineSnapshot(`
+      const MyComponent = {
+        view: () => m("div", {
+          "data-component": "MyComponent"
+        })
+      };
+    `);
+  });
 });
 
 describe("function expressions", () => {
@@ -171,6 +187,22 @@ describe("function expressions", () => {
     `);
   });
 
+  it("converts comp as object with view prop", () => {
+    expect(
+      testTransform(`
+          const MyComponent = { view: function () { return m("div"); } }
+        `)
+    ).toMatchInlineSnapshot(`
+      const MyComponent = {
+        view: function () {
+          return m("div", {
+            "data-component": "MyComponent"
+          });
+        }
+      };
+    `);
+  });
+
   it("uses variable name when anon function", () => {
     expect(
       testTransform(`
@@ -180,8 +212,9 @@ describe("function expressions", () => {
       `)
     ).toMatchInlineSnapshot(`
       const MyComponent = function () {
-        return m("div",
-          "data-component": "MyComponent");
+        return m("div", {
+          "data-component": "MyComponent"
+        });
       };
     `);
   });
@@ -228,72 +261,9 @@ describe("uses filename ass fallback", () => {
     ).toMatchInlineSnapshot(`
       export default class extends m.Component {
         view() {
-          return m("div",
-            "data-component": "MyComponent.js"
-          );
-        }
-
-      }
-    `);
-
-    expect(
-      testTransform(
-        `
-      export default function() {
-        return m("div");
-      }
-    `,
-        {},
-        { filename }
-      )
-    ).toMatchInlineSnapshot(`
-      export default function () {
-        return m("div", {
-          "data-component": "MyComponent.js"
-        });
-      }
-    `);
-
-    expect(
-      testTransform(
-        `
-      export default () => {
-        return m("div");
-      }
-    `,
-        {},
-        { filename }
-      )
-    ).toMatchInlineSnapshot(`
-      export default (() => {
-        return m("div",
-          "data-component": "MyComponent.js"
-        );
-      });
-    `);
-  });
-
-  it("uses the file’s directory name when it is an index file", () => {
-    const filename = resolve("MyComponent/index.js");
-
-    expect(
-      testTransform(
-        `
-      export default class extends m.Component {
-        view() {
-          return m("div");
-        }
-      }
-    `,
-        {},
-        { filename }
-      )
-    ).toMatchInlineSnapshot(`
-      export default class extends m.Component {
-        view() {
-          return m("div",
+          return m("div", {
             "data-component": "MyComponent"
-          );
+          });
         }
 
       }
@@ -329,7 +299,72 @@ describe("uses filename ass fallback", () => {
       )
     ).toMatchInlineSnapshot(`
       export default (() => {
+        return m("div", {
+          "data-component": "MyComponent"
+        });
+      });
+    `);
+  });
+
+  it("uses the file’s directory name when it is an index file", () => {
+    const filename = resolve("MyComponent/index.js");
+
+    expect(
+      testTransform(
+        `
+      export default class extends m.Component {
+        view() {
+          return m("div");
+        }
+      }
+    `,
+        {},
+        { filename }
+      )
+    ).toMatchInlineSnapshot(`
+      export default class extends m.Component {
+        view() {
+          return m("div", {
+            "data-component": "MyComponent"
+          });
+        }
+
+      }
+    `);
+
+    expect(
+      testTransform(
+        `
+      export default function() {
         return m("div");
+      }
+    `,
+        {},
+        { filename }
+      )
+    ).toMatchInlineSnapshot(`
+      export default function () {
+        return m("div", {
+          "data-component": "MyComponent"
+        });
+      }
+    `);
+
+    expect(
+      testTransform(
+        `
+      export default () => {
+        return m("div");
+      }
+    `,
+        {},
+        { filename }
+      )
+    ).toMatchInlineSnapshot(`
+      export default (() => {
+        return m("div", {
+          "data-component": "MyComponent"
+        });
       });
     `);
   });
