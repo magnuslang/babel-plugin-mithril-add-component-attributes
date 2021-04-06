@@ -6,7 +6,7 @@ BETA. This plugin adds a `data-component` attribute to top-level DOM elements re
 - tries to figure out component name from function or variable def
 - if no name found it tries to use the file name, so you'll know where to start
 
-Needs more tests and better support for function/class-declarations.
+Needs more tests and better support for class-declarations.
 
 ## Examples
 

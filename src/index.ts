@@ -1,6 +1,5 @@
-import { extname, basename, dirname, resolve } from "path";
+import { extname, basename, dirname } from "path";
 
-import { TransformOptions, transform } from "@babel/core";
 import { NodePath, Visitor } from "babel-traverse";
 import * as types from "babel-types";
 
@@ -38,7 +37,7 @@ const fileDetails = (file: FileOpts): string => {
   return details.name === "index" ? details.directory : details.name;
 };
 
-export function babelPluginMithrilComponentDataAttrs({ types: t }: Types): Plugin {
+export default function babelPluginMithrilComponentDataAttrs({ types: t }: Types): Plugin {
   function createObjectProperties(name: string): types.ObjectProperty {
     name;
     return t.objectProperty(t.stringLiteral(DATA_ATTRIBUTE), t.stringLiteral(name));
@@ -210,18 +209,3 @@ export function babelPluginMithrilComponentDataAttrs({ types: t }: Types): Plugi
     },
   };
 }
-
-// used for test and development
-export const testTransform = (code: string, pluginOptions = {}, transformOptions: TransformOptions = {}) => {
-  if (!code) {
-    return "";
-  }
-
-  const result = transform(code, {
-    plugins: [babelPluginMithrilComponentDataAttrs, pluginOptions],
-    babelrc: false,
-    ...transformOptions,
-  });
-
-  return result?.code || "";
-};

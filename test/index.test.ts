@@ -1,5 +1,22 @@
 import { resolve } from "path";
-import { testTransform } from "../src";
+import { TransformOptions, transform } from "@babel/core";
+
+import babelPluginMithrilComponentDataAttrs from "../src";
+
+// used for test and development
+export const testTransform = (code: string, pluginOptions = {}, transformOptions: TransformOptions = {}) => {
+  if (!code) {
+    return "";
+  }
+
+  const result = transform(code, {
+    plugins: [babelPluginMithrilComponentDataAttrs, pluginOptions],
+    babelrc: false,
+    ...transformOptions,
+  });
+
+  return result?.code || "";
+};
 
 const unstringSnapshotSerializer = {
   test: (val) => typeof val === "string",
