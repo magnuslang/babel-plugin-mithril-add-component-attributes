@@ -1,22 +1,5 @@
 import { resolve } from "path";
-import { TransformOptions, transform } from "@babel/core";
-
-import babelPluginMithrilComponentDataAttrs from "../src";
-
-// used for test and development
-export const testTransform = (code: string, pluginOptions = {}, transformOptions: TransformOptions = {}) => {
-  if (!code) {
-    return "";
-  }
-
-  const result = transform(code, {
-    plugins: [babelPluginMithrilComponentDataAttrs, pluginOptions],
-    babelrc: false,
-    ...transformOptions,
-  });
-
-  return result?.code || "";
-};
+import { testTransform } from "../src";
 
 const unstringSnapshotSerializer = {
   test: (val) => typeof val === "string",
@@ -177,7 +160,7 @@ describe("function expressions", () => {
     ).toMatchInlineSnapshot(`
       function MyComponent() {
         const markup = m("div", {
-          "data-component": "markup"
+          "data-component": "MyComponent->markup"
         });
         return markup;
       }
@@ -383,6 +366,92 @@ describe("uses filename ass fallback", () => {
           "data-component": "MyComponent"
         });
       });
+    `);
+  });
+});
+
+describe("malformed cases", () => {
+  it("does nothing if no component", () => {
+    expect(
+      testTransform(
+        `
+      export default () => {
+        return m();
+      }
+    `
+      )
+    ).toMatchInlineSnapshot(`
+      export default (() => {
+        return m();
+      });
+    `);
+  });
+
+  it("finds outer func name in nested statements", () => {
+    expect(
+      testTransform(
+        `
+        function MyFunction() {
+          return {
+            view: () =>
+              m(
+                "ul.w-full",
+              ),
+          };
+        }
+    `
+      )
+    ).toMatchInlineSnapshot(`
+      function MyFunction() {
+        return {
+          view: () => m("ul.w-full", {
+            "data-component": "MyFunction"
+          })
+        };
+      }
+    `);
+  });
+
+  it("can handle array components", () => {
+    expect(
+      testTransform(
+        `
+        function MyFunction() {
+          return [{
+            view: () =>
+              m(
+                "ul.w-full",
+              ),
+          }];
+        }
+    `
+      )
+    ).toMatchInlineSnapshot(`
+      function MyFunction() {
+        return [{
+          view: () => m("ul.w-full", {
+            "data-component": "MyFunction"
+          })
+        }];
+      }
+    `);
+  });
+
+  it("can handle expressions", () => {
+    expect(
+      testTransform(
+        `
+        function MyFunction() {
+          return true && m("div");
+        }
+    `
+      )
+    ).toMatchInlineSnapshot(`
+      function MyFunction() {
+        return true && m('div', {
+          "data-component": "MyFunction"
+        });
+      }
     `);
   });
 });

@@ -1,5 +1,6 @@
 import { extname, basename, dirname } from "path";
 
+import { TransformOptions, transform } from "@babel/core";
 import { NodePath, Visitor } from "babel-traverse";
 import * as types from "babel-types";
 
@@ -124,9 +125,11 @@ export default function babelPluginMithrilComponentDataAttrs({ types: t }: Types
           source: path,
           ...state,
         });
-      } else {
-        path.traverse(functionVisitor, { name, source: path, ...state });
+        path.skip();
+        return;
       }
+
+      path.traverse(functionVisitor, { name, source: path, ...state });
     },
     ClassDeclaration: (path, state) => {
       const name = nameForComponent(path, state.file);
@@ -138,10 +141,16 @@ export default function babelPluginMithrilComponentDataAttrs({ types: t }: Types
     },
     ObjectMember: (path, state) => {
       const props = path.get("key");
-      if (props.isIdentifier() && props.node.name === "view") {
-        path.traverse(functionVisitor, state);
-        path.skip();
+      const value = path.get("value");
+
+      if (!(props.isIdentifier() && props.node.name === "view")) {
+        return;
       }
+      if (value.isCallExpression()) {
+        path.traverse(functionVisitor, state);
+      }
+      path.traverse(programVisitor, state);
+      path.skip();
     },
   };
 
@@ -157,6 +166,10 @@ export default function babelPluginMithrilComponentDataAttrs({ types: t }: Types
       }
 
       const { arguments: args } = path.node;
+
+      if (args.length === 0) {
+        return;
+      }
 
       if (args.length === 1) {
         args.push(t.objectExpression([createObjectProperties(name)]));
@@ -186,17 +199,26 @@ export default function babelPluginMithrilComponentDataAttrs({ types: t }: Types
   const returnStatementVisitor: Visitor<{ name: string; source: NodePath }> = {
     ReturnStatement(path, state) {
       const arg = path.get("argument");
+
       if (arg.isIdentifier()) {
         const binding = path.scope.getBinding(arg.node.name);
-        binding;
         if (binding == null) {
           return;
         }
-        binding.path.traverse(functionVisitor, state);
-      } else {
-        path;
-        path.traverse(functionVisitor, { ...state, source: path });
+        binding.path.traverse(functionVisitor, {
+          ...state,
+          source: binding.path,
+          name: `${state.name}->${arg.node.name}`,
+        });
+        return;
       }
+
+      if (arg.isObjectExpression()) {
+        arg.traverse(programVisitor, { ...state, source: path });
+        return;
+      }
+
+      path.traverse(functionVisitor, { ...state, source: path });
     },
   };
 
@@ -209,3 +231,115 @@ export default function babelPluginMithrilComponentDataAttrs({ types: t }: Types
     },
   };
 }
+
+// used for test and development
+export const testTransform = (code: string, pluginOptions = {}, transformOptions: TransformOptions = {}) => {
+  if (!code) {
+    return "";
+  }
+
+  const result = transform(code, {
+    plugins: [babelPluginMithrilComponentDataAttrs, pluginOptions],
+    babelrc: false,
+    ...transformOptions,
+  });
+
+  return result?.code || "";
+};
+
+const test = testTransform(
+  `
+  import classnames from "classnames";
+  import m from "mithril";
+  import { Alert } from "~/components";
+  import { t } from "~/Localizer";
+  import { getActiveNews, markAsRead } from "~/scenes/news/News";
+  import { NewsModal } from "~/scenes/news/NewsModal";
+  import * as Buttons from "~/widgets/Buttons";
+  
+  const NewsAlert = {
+    view(/** @type {m.Vnode} */ { attrs: { class: classname, news, onClose, model }, children }) {
+      return [
+        m(Alert, {
+          class: classnames("animate-slide-in-top mt-md", classname),
+          message: [
+            news.subject,
+            " ",
+            Buttons.smallBtnPositive(t("ActiveNews.buttonReadMore"), () => model.showNewsItem(news.id)),
+            " ",
+            children,
+          ],
+          onClose: () => onClose(news),
+        }),
+      ];
+    },
+  };
+  
+  class Model {
+    constructor() {
+      this.showNews = false;
+      this.newsList = [];
+      this.newsItem = {};
+    }
+    setNews(news) {
+      this.newsList = news;
+    }
+    showNewsItem(id) {
+      this.newsItem = this.newsList.find((n) => n.id === id);
+      this.showNews = true;
+    }
+  }
+  
+  export const ActiveNewsBanner = {
+    oninit() {
+      this.lastHiddenIds = [];
+      this.showMore = false;
+      this.model = new Model();
+    },
+    view({ attrs: { centered } }) {
+      const { data: news } = getActiveNews();
+      const nonHiddenNews = news.filter((news) => !this.lastHiddenIds.includes(news.id));
+      this.model.setNews(nonHiddenNews);
+      const canShowMore = !this.showMore && nonHiddenNews.length > 1;
+      const canShowLess = this.showMore && nonHiddenNews.length > 1;
+      const hasNewsToShow = nonHiddenNews.length > 0;
+  
+      // This eslint rule has problems with
+      // eslint-disable-next-line unicorn/consistent-function-scoping
+      const hide = (news) => {
+        this.lastHiddenIds.push(news.id);
+      };
+  
+      return (
+        m("div.z-notification-behind-backdrop.px-md.pb-md", [
+          this.model.showNews &&
+            m(NewsModal, {
+              newsItem: this.model.newsItem,
+              closeFn: () => {
+                markAsRead(this.model.newsItem.id);
+                this.model.showNews = false;
+              },
+            }),
+          m(
+            NewsAlert,
+            { class: centered ? "container mx-auto" : null, news: nonHiddenNews[0], onClose: hide, model: this.model },
+            canShowMore && Buttons.smallBtnDefault(t("ActiveNews.buttonShowMore"), () => (this.showMore = true)),
+            canShowLess && Buttons.smallBtnDefault(t("ActiveNews.buttonShowLess"), () => (this.showMore = false))
+          ),
+          this.showMore &&
+            nonHiddenNews.length > 1 &&
+            nonHiddenNews
+              .slice(1)
+              .map((news) =>
+                m(NewsAlert, { class: centered ? "container mx-auto" : null, model: this.model, news, onClose: hide })
+              ),
+        ])
+      );
+    },
+  };
+  
+`
+);
+
+test;
+console.log(test);
