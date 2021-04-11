@@ -1,5 +1,21 @@
 import { resolve } from "path";
-import { testTransform } from "../src";
+import { TransformOptions, transform } from "@babel/core";
+import babelPluginMithrilComponentDataAttrs from "../src";
+
+// used for test and development
+export const testTransform = (code: string, pluginOptions = {}, transformOptions: TransformOptions = {}) => {
+  if (!code) {
+    return "";
+  }
+
+  const result = transform(code, {
+    plugins: [babelPluginMithrilComponentDataAttrs, pluginOptions],
+    babelrc: false,
+    ...transformOptions,
+  });
+
+  return result?.code || "";
+};
 
 const unstringSnapshotSerializer = {
   test: (val) => typeof val === "string",
@@ -101,13 +117,15 @@ describe("arrow expressions", () => {
 
     expect(
       testTransform(`
-      const Comp2 = {};
+      const Comp2 = () => m('div');
       const MyComponent = () => {
           return m("div", m(Comp2));
       }
     `)
     ).toMatchInlineSnapshot(`
-      const Comp2 = {};
+      const Comp2 = () => m('div', {
+        "data-component": "Comp2"
+      });
 
       const MyComponent = () => {
         return m("div", {
@@ -218,31 +236,78 @@ describe("function expressions", () => {
       };
     `);
   });
+
+  it("finds outer function name when nested anon function", () => {
+    expect(
+      testTransform(`
+      function of(resource) {
+        return {
+          view: (vnode) => {
+            return m(Comp, { svg: resource, ...vnode.attrs });
+          },
+        };
+      }
+      `)
+    ).toMatchInlineSnapshot(`
+      function of(resource) {
+        return {
+          view: vnode => {
+            return m(Comp, {
+              svg: resource,
+              ...vnode.attrs,
+              "data-component": "of"
+            });
+          }
+        };
+      }
+    `);
+  });
 });
 
-// describe("can handle class defs", () => {
-//   it("uses the variable name when no name exists", () => {
-//     expect(
-//       testTransform(`
-//         const MyComponent = class extends Roffe {
-//           view() {
-//             return m("div");
-//           }
-//         }
-//       `)
-//     ).toMatchInlineSnapshot(`
-//       "const MyComponent = class extends Roffe {
-//         view() {
-//           return m("div", {
-//             "data-component": "MyComponent"
-//           });
-//         }
-//       };"
-//     `);
-//   });
-// });
+describe("can handle class defs", () => {
+  it("uses the variable name when no name exists", () => {
+    expect(
+      testTransform(`
+        const MyComponent = class extends Roffe {
+          view() {
+            return m("div");
+          }
+        }
+      `)
+    ).toMatchInlineSnapshot(`
+      const MyComponent = class extends Roffe {
+        view() {
+          return m("div", {
+            "data-component": "MyComponent"
+          });
+        }
 
-describe("uses filename ass fallback", () => {
+      };
+    `);
+  });
+  //   it("uses the class name when exists", () => {
+  //     expect(
+  //       testTransform(`
+  //         class Car extends Vehicle {
+  //           view() {
+  //             return m("div");
+  //           }
+  //         }
+  //       `)
+  //     ).toMatchInlineSnapshot(`
+  //       class Car extends Vehicle {
+  //         view() {
+  //           return m("div", {
+  //             "data-component": "Car"
+  //           });
+  //         }
+
+  //       }
+  //     `);
+  //   });
+});
+
+describe("uses filename as fallback", () => {
   it("uses the file’s basename when it is not unknown and is not an index file", () => {
     const filename = resolve("MyComponent.js");
 
@@ -448,10 +513,149 @@ describe("malformed cases", () => {
       )
     ).toMatchInlineSnapshot(`
       function MyFunction() {
-        return true && m('div', {
+        return true && m("div", {
           "data-component": "MyFunction"
         });
       }
+    `);
+  });
+
+  it("can handle more complex functions", () => {
+    expect(
+      testTransform(
+        `
+        const Comp2 = () => m('div', {
+          "data-component": "Comp2"
+        });
+      
+        const MyComponent = () => {
+      
+          const a = m("b");
+      
+          return m("div", {
+            "data-component": "MyComponent"
+          }, m(Comp2));
+        };
+    `
+      )
+    ).toMatchInlineSnapshot(`
+      const Comp2 = () => m('div', {
+        "data-component": "Comp2"
+      });
+
+      const MyComponent = () => {
+        const a = m("b", {
+          "data-component": "MyComponent->a"
+        });
+        return m("div", {
+          "data-component": "MyComponent"
+        }, m(Comp2));
+      };
+    `);
+  });
+
+  it("can handle 'attrs' as Identifier or MemberExpression - by loose convention", () => {
+    expect(
+      testTransform(
+        `
+        const a = m("b", vnode.attrs, vnode.children);
+    `
+      )
+    ).toMatchInlineSnapshot(`
+      const a = m("b", Object.assign({
+        "data-component": "a"
+      }, vnode.attrs), vnode.children);
+    `);
+
+    expect(
+      testTransform(
+        `
+        const b = m("b", attrs, vnode.children);
+    `
+      )
+    ).toMatchInlineSnapshot(`
+      const b = m("b", Object.assign({
+        "data-component": "b"
+      }, attrs), vnode.children);
+    `);
+  });
+
+  it("handles MemberExpression in ObjectExpression and ReturnStatement", () => {
+    expect(
+      testTransform(
+        `
+        var Wrapper = {
+          view: (vnode) => {
+            return m(Error, { error: vnode.attrs.error });
+          },
+        };
+        `
+      )
+    ).toMatchInlineSnapshot(`
+      var Wrapper = {
+        view: vnode => {
+          return m(Error, {
+            error: vnode.attrs.error,
+            "data-component": "Wrapper"
+          });
+        }
+      };
+    `);
+  });
+
+  it("can handle more complex wrapper", () => {
+    expect(
+      testTransform(
+        `
+        var Wrapper = {
+          view: (vnode) => {
+            var { disabled, test, someVar } = vnode.attrs;
+        
+            if (someVar) {
+              return m(test ? Comp1 : Comp2, vnode.attrs, vnode.children);
+            } else {
+              return [
+                disabled
+                  ? m(Sad)
+                  : m(
+                      Happy,
+                      {
+                        onChange: () => {},
+                      }
+                    ),
+                m(Error, { error: vnode.attrs.error }),
+              ];
+            }
+          },
+        };
+    `
+      )
+    ).toMatchInlineSnapshot(`
+      var Wrapper = {
+        view: vnode => {
+          var {
+            disabled,
+            test,
+            someVar
+          } = vnode.attrs;
+
+          if (someVar) {
+            return m(test ? Comp1 : Comp2, Object.assign({
+              "data-component": "Wrapper"
+            }, vnode.attrs), vnode.children);
+          } else {
+            return [disabled ? m(Sad, {
+              "data-component": "Wrapper"
+            }) : m(Happy, {
+              onChange: () => {},
+              "data-component": "Wrapper"
+            }), m(Error, {
+              error: vnode.attrs.error,
+              "data-component": "Wrapper"
+            })];
+          }
+        }
+      };
     `);
   });
 });

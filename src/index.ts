@@ -1,6 +1,5 @@
 import { extname, basename, dirname } from "path";
 
-import { TransformOptions, transform } from "@babel/core";
 import { NodePath, Visitor } from "babel-traverse";
 import * as types from "babel-types";
 
@@ -34,14 +33,27 @@ const fileDetails = (file: FileOpts): string => {
     directory: basename(dirname(filename)),
     name: basename(filename, extname(filename)),
   };
-
   return details.name === "index" ? details.directory : details.name;
 };
 
 export default function babelPluginMithrilComponentDataAttrs({ types: t }: Types): Plugin {
   function createObjectProperties(name: string): types.ObjectProperty {
-    name;
     return t.objectProperty(t.stringLiteral(DATA_ATTRIBUTE), t.stringLiteral(name));
+  }
+
+  function nameForAnnonCallExpression(path: NodePath, file: FileOpts) {
+    // try to get a named function parent
+    let p = path;
+
+    while (p) {
+      p = p.getFunctionParent();
+      if (t.isFunctionDeclaration(p) && p.isFunctionDeclaration() && p.node?.id?.name) {
+        return p.node.id.name;
+      }
+    }
+
+    // last resort: file details
+    return fileDetails(file);
   }
 
   function nameForComponent(
@@ -73,24 +85,13 @@ export default function babelPluginMithrilComponentDataAttrs({ types: t }: Types
       return passedDownName;
     }
 
+    // last resort: file details
     return fileDetails(file);
   }
 
-  const programVisitor: Visitor = {
+  const programVisitor: Visitor<{ name: string; source: NodePath }> = {
     VariableDeclarator: (path, state) => {
       const name = nameForComponent(path, state.file);
-
-      const init = path.get("init") as NodePath;
-
-      if (t.isCallExpression(init)) {
-        path.traverse(functionVisitor, {
-          name,
-          source: path,
-          ...state,
-        });
-        return;
-      }
-
       path.traverse(programVisitor, { name, source: path, ...state });
       path.skip();
     },
@@ -99,104 +100,84 @@ export default function babelPluginMithrilComponentDataAttrs({ types: t }: Types
       const isBlock = path.get("body").isBlockStatement();
 
       if (!isBlock) {
-        path.traverse(functionVisitor, {
+        path.traverse(programVisitor, {
           name,
           source: path,
           file: state.file,
         });
       } else {
-        path.traverse(returnStatementVisitor, {
+        path.traverse(programVisitor, {
           name,
           source: path,
           file: state.file,
         });
       }
+      path.skip();
     },
     FunctionExpression: (path, state) => {
       const name = nameForComponent(path, state.file, state.name);
-      path.traverse(functionVisitor, { name, source: path, ...state });
+      path.traverse(programVisitor, { name, source: path, ...state });
+      path.skip();
     },
     FunctionDeclaration: (path, state) => {
       const name = nameForComponent(path, state.file);
-
-      if (path.get("body").isBlockStatement()) {
-        path.traverse(returnStatementVisitor, {
-          name,
-          source: path,
-          ...state,
-        });
-        path.skip();
-        return;
-      }
-
-      path.traverse(functionVisitor, { name, source: path, ...state });
+      name;
+      path.traverse(programVisitor, { name, source: path, ...state });
+      path.skip();
     },
     ClassDeclaration: (path, state) => {
       const name = nameForComponent(path, state.file);
-      path.traverse(returnStatementVisitor, { name, source: state.source });
+      name;
+      path.traverse(programVisitor, { name, source: state.source });
+      path.skip();
     },
     ExportDefaultDeclaration: (path, state) => {
       const name = fileDetails(state.file);
-      path.traverse(returnStatementVisitor, { name, source: state.source });
+      path.traverse(programVisitor, { ...state, name, source: path });
+      path.skip();
     },
     ObjectMember: (path, state) => {
       const props = path.get("key");
-      const value = path.get("value");
 
       if (!(props.isIdentifier() && props.node.name === "view")) {
         return;
       }
-      if (value.isCallExpression()) {
-        path.traverse(functionVisitor, state);
-      }
+
       path.traverse(programVisitor, state);
       path.skip();
     },
-  };
-
-  const functionVisitor: Visitor<{ name: string; source: NodePath }> = {
-    CallExpression: (path, { name, source }) => {
-      // only add to the outermost component, not in a nested function
-      if (path.parent !== source.node && !t.isVariableDeclarator(source)) {
-        return;
-      }
-
+    CallExpression: (path, state) => {
       if (!t.isIdentifier(path.node.callee, { name: "m" })) {
         return;
       }
+      const isVar = t.isVariableDeclarator(path.parentPath.node);
+      if (isVar) {
+        const pp = path.parentPath as NodePath<types.VariableDeclarator>;
 
-      const { arguments: args } = path.node;
+        const isIdent = t.isIdentifier(pp.node.id);
 
-      if (args.length === 0) {
-        return;
+        if (isIdent) {
+          const id = pp.node.id as types.Identifier;
+
+          if (state.name !== id.name) {
+            addAttribute(path, {
+              ...state,
+              source: path,
+              name: `${state.name}->${id.name}`,
+            });
+            path.skip();
+            return;
+          }
+        }
       }
 
-      if (args.length === 1) {
-        args.push(t.objectExpression([createObjectProperties(name)]));
-        return;
-      }
-
-      const secondArgument = path.get("arguments.1") as NodePath;
-
-      if (!secondArgument.isObjectExpression()) {
-        // insert an object with props here
-        args.splice(1, 0, t.objectExpression([createObjectProperties(name)]));
-        return;
-      }
-
-      const hasDataAttribute = secondArgument.node.properties.find(
-        (property) => t.isObjectProperty(property) && t.isStringLiteral(property.key, { value: DATA_ATTRIBUTE })
-      );
-
-      if (hasDataAttribute) {
-        return;
-      }
-
-      secondArgument.node.properties.push(createObjectProperties(name));
+      addAttribute(path, {
+        ...state,
+        source: path,
+        name: state.name || nameForAnnonCallExpression(path, state.file),
+      });
+      path.skip();
     },
-  };
-
-  const returnStatementVisitor: Visitor<{ name: string; source: NodePath }> = {
     ReturnStatement(path, state) {
       const arg = path.get("argument");
 
@@ -205,21 +186,90 @@ export default function babelPluginMithrilComponentDataAttrs({ types: t }: Types
         if (binding == null) {
           return;
         }
-        binding.path.traverse(functionVisitor, {
+        binding.path.traverse(programVisitor, {
           ...state,
           source: binding.path,
           name: `${state.name}->${arg.node.name}`,
         });
         return;
       }
+    },
+  };
 
-      if (arg.isObjectExpression()) {
-        arg.traverse(programVisitor, { ...state, source: path });
+  const mithrilAttrVisitor: Visitor<{ name: string; source: NodePath }> = {
+    ObjectExpression: (path, { name }) => {
+      // insert into object
+      const hasDataAttribute = path.node.properties.find(
+        (property) => t.isObjectProperty(property) && t.isStringLiteral(property.key, { value: DATA_ATTRIBUTE })
+      );
+
+      if (hasDataAttribute) {
         return;
       }
 
-      path.traverse(functionVisitor, { ...state, source: path });
+      path.node.properties.push(createObjectProperties(name));
+      path.stop();
     },
+    Identifier: (path, state) => {
+      if (!state.target) {
+        return;
+      }
+
+      path;
+      // this is so you can use 'attrs' convention when Identifier is unknown at compile-time
+      if (path.node.name === "attrs") {
+        state.target.replaceWith(
+          merge(t.objectExpression([createObjectProperties(state.name)]), state.memeberParent || path.node)
+        );
+      }
+
+      path.skip();
+    },
+    MemberExpression: (path, state) => {
+      if (!state.target) {
+        return;
+      }
+
+      // this is so you can use 'attrs' convention when Identifier is unknown at compile-time
+      if (t.isIdentifier(path.node.property) && path.node.property.name === "attrs") {
+        state.target.replaceWith(merge(t.objectExpression([createObjectProperties(state.name)]), path.node));
+      }
+
+      path.stop();
+    },
+  };
+
+  const addAttribute = (path: NodePath<types.CallExpression>, state: { name: string; source: NodePath }) => {
+    const { name } = state;
+    const { arguments: args } = path.node;
+    if (args.length === 0) {
+      return;
+    }
+
+    if (!name) {
+      return;
+    }
+
+    if (args.length === 1) {
+      args.push(t.objectExpression([createObjectProperties(name)]));
+      return;
+    }
+    const targetPath = path.get("arguments.1");
+    const target = path.node.arguments[1];
+
+    if (t.isObjectExpression(target) || t.isMemberExpression(target) || t.isIdentifier(target)) {
+      path.traverse(mithrilAttrVisitor, { target: targetPath, ...state });
+      return;
+    }
+
+    // inject new attrs if we dont find any possible existing
+    path.node.arguments.splice(1, 0, t.objectExpression([createObjectProperties(name)]));
+  };
+
+  const merge = (obj: types.ObjectExpression, expr: types.Identifier | types.MemberExpression) => {
+    return t.expressionStatement(
+      t.callExpression(t.memberExpression(t.identifier("Object"), t.identifier("assign")), [obj, expr])
+    );
   };
 
   return {
@@ -231,115 +281,3 @@ export default function babelPluginMithrilComponentDataAttrs({ types: t }: Types
     },
   };
 }
-
-// used for test and development
-export const testTransform = (code: string, pluginOptions = {}, transformOptions: TransformOptions = {}) => {
-  if (!code) {
-    return "";
-  }
-
-  const result = transform(code, {
-    plugins: [babelPluginMithrilComponentDataAttrs, pluginOptions],
-    babelrc: false,
-    ...transformOptions,
-  });
-
-  return result?.code || "";
-};
-
-const test = testTransform(
-  `
-  import classnames from "classnames";
-  import m from "mithril";
-  import { Alert } from "~/components";
-  import { t } from "~/Localizer";
-  import { getActiveNews, markAsRead } from "~/scenes/news/News";
-  import { NewsModal } from "~/scenes/news/NewsModal";
-  import * as Buttons from "~/widgets/Buttons";
-  
-  const NewsAlert = {
-    view(/** @type {m.Vnode} */ { attrs: { class: classname, news, onClose, model }, children }) {
-      return [
-        m(Alert, {
-          class: classnames("animate-slide-in-top mt-md", classname),
-          message: [
-            news.subject,
-            " ",
-            Buttons.smallBtnPositive(t("ActiveNews.buttonReadMore"), () => model.showNewsItem(news.id)),
-            " ",
-            children,
-          ],
-          onClose: () => onClose(news),
-        }),
-      ];
-    },
-  };
-  
-  class Model {
-    constructor() {
-      this.showNews = false;
-      this.newsList = [];
-      this.newsItem = {};
-    }
-    setNews(news) {
-      this.newsList = news;
-    }
-    showNewsItem(id) {
-      this.newsItem = this.newsList.find((n) => n.id === id);
-      this.showNews = true;
-    }
-  }
-  
-  export const ActiveNewsBanner = {
-    oninit() {
-      this.lastHiddenIds = [];
-      this.showMore = false;
-      this.model = new Model();
-    },
-    view({ attrs: { centered } }) {
-      const { data: news } = getActiveNews();
-      const nonHiddenNews = news.filter((news) => !this.lastHiddenIds.includes(news.id));
-      this.model.setNews(nonHiddenNews);
-      const canShowMore = !this.showMore && nonHiddenNews.length > 1;
-      const canShowLess = this.showMore && nonHiddenNews.length > 1;
-      const hasNewsToShow = nonHiddenNews.length > 0;
-  
-      // This eslint rule has problems with
-      // eslint-disable-next-line unicorn/consistent-function-scoping
-      const hide = (news) => {
-        this.lastHiddenIds.push(news.id);
-      };
-  
-      return (
-        m("div.z-notification-behind-backdrop.px-md.pb-md", [
-          this.model.showNews &&
-            m(NewsModal, {
-              newsItem: this.model.newsItem,
-              closeFn: () => {
-                markAsRead(this.model.newsItem.id);
-                this.model.showNews = false;
-              },
-            }),
-          m(
-            NewsAlert,
-            { class: centered ? "container mx-auto" : null, news: nonHiddenNews[0], onClose: hide, model: this.model },
-            canShowMore && Buttons.smallBtnDefault(t("ActiveNews.buttonShowMore"), () => (this.showMore = true)),
-            canShowLess && Buttons.smallBtnDefault(t("ActiveNews.buttonShowLess"), () => (this.showMore = false))
-          ),
-          this.showMore &&
-            nonHiddenNews.length > 1 &&
-            nonHiddenNews
-              .slice(1)
-              .map((news) =>
-                m(NewsAlert, { class: centered ? "container mx-auto" : null, model: this.model, news, onClose: hide })
-              ),
-        ])
-      );
-    },
-  };
-  
-`
-);
-
-test;
-console.log(test);
