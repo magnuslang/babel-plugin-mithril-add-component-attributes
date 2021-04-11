@@ -659,3 +659,98 @@ describe("malformed cases", () => {
     `);
   });
 });
+
+describe("attrs and spread operators", () => {
+  it("ignores when data-param exists", () => {
+    expect(
+      testTransform(`
+        const Button = {
+          view: (vnode) => {
+            const { label, ...attrs } = vnode.attrs;
+            return m(
+              "div",
+              {
+                "data-component": "Button",
+                ...attrs,
+              },
+              label
+            );
+          },
+        };
+    `)
+    ).toMatchInlineSnapshot(`
+        const Button = {
+          view: vnode => {
+            const {
+              label,
+              ...attrs
+            } = vnode.attrs;
+            return m("div", {
+              "data-component": "Button",
+              ...attrs
+            }, label);
+          }
+        };
+    `);
+  });
+
+  it("can handle object attrs with spread operator", () => {
+    expect(
+      testTransform(`
+        const Button = {
+          view: (vnode) => {
+            const { label, ...attrs } = vnode.attrs;
+            return m(
+              "div",
+              {
+                ...attrs,
+              },
+              label
+            );
+          },
+        };
+    `)
+    ).toMatchInlineSnapshot(`
+      const Button = {
+        view: vnode => {
+          const {
+            label,
+            ...attrs
+          } = vnode.attrs;
+          return m("div", { ...attrs,
+            "data-component": "Button"
+          }, label);
+        }
+      };
+    `);
+  });
+
+  it("can handle attrs named param", () => {
+    expect(
+      testTransform(`
+        const Button = {
+          view: (vnode) => {
+            const { label, ...attrs } = vnode.attrs;
+            return m(
+              "div",
+              attrs,
+              label
+            );
+          },
+        };
+    `)
+    ).toMatchInlineSnapshot(`
+      const Button = {
+        view: vnode => {
+          const {
+            label,
+            ...attrs
+          } = vnode.attrs;
+          return m("div", Object.assign({
+            "data-component": "Button"
+          }, attrs), label);
+        }
+      };
+    `);
+  });
+});

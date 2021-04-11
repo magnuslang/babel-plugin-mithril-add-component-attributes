@@ -204,6 +204,7 @@ export default function babelPluginMithrilComponentDataAttrs({ types: t }: Types
       );
 
       if (hasDataAttribute) {
+        path.stop();
         return;
       }
 
