@@ -1,10 +1,18 @@
 {
   "name": "babel-plugin-mithril-add-data-attribute",
-  "version": "1.0.7",
-  "description": "Babel plugin adds attributes to m() components - intended for development. Helps debug - find your components in a large repo. Adds component name and file to component data attributes which will be visible in the generated HTML.",
+  "version": "1.0.8",
+  "description": "Babel plugin adds attributes to m() components - intended for development - do not used in production. Helps debug - find your components in a large repo. Adds component name and file to component data attributes which will be visible in the generated HTML.",
   "main": "index.js",
   "author": "Magnus Lång <magnuslang@gmail.com>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/magnuslang/babel-plugin-mithril-add-component-attributes.git"
+  },
+  "bugs": {
+    "url": "https://github.com/magnuslang/babel-plugin-mithril-add-component-attributes/issues"
+  },
+  "homepage": "https://github.com/magnuslang/babel-plugin-mithril-add-component-attributes#readme",
   "scripts": {
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc",

@@ -7,7 +7,7 @@ This plugin adds a `data-component` attribute to top-level DOM elements rendered
 - when not resolvable: assumes `attrs` to be an object and `getAttrs` to be a function returning an `attrs` object
 
 Needs more tests and better support, feel free to add issues with failing test code or commit a PR.
-Written in TypeScript.
+Written in TypeScript. Not tested or used in production.
 
 ## Examples
 
@@ -60,9 +60,15 @@ npm install --save-dev babel-plugin-mithril-add-data-attribute
 
 ```json
 {
-  "plugins": ["mithril-add-data-attribute"]
+  "env": {
+    "development": {
+      "plugins": ["mithril-add-data-attribute"]
+    }
+  }
 }
 ```
+
+(since it's not intended for production code)
 
 ### Via CLI
 
@@ -80,7 +86,7 @@ require("babel-core").transform("code", {
 
 ## Options
 
-Under development. Requests?
+Under development.
 
 ## Contribute
 
