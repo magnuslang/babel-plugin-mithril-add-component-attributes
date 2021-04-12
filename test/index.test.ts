@@ -51,6 +51,18 @@ describe("inputs attributes in options object or creates one", () => {
     `);
   });
 
+  it("handles wrapped components", () => {
+    expect(
+      testTransform(`
+          const MyComponent = wrapper(m("div", "text"));
+        `)
+    ).toMatchInlineSnapshot(`
+      const MyComponent = wrapper(m("div", {
+        "data-component": "MyComponent"
+      }, "text"));
+    `);
+  });
+
   it("converts m with options arg, no data-attribute", () => {
     expect(
       testTransform(`
@@ -749,6 +761,74 @@ describe("attrs and spread operators", () => {
           return m("div", Object.assign({
             "data-component": "Button"
           }, attrs), label);
+        }
+      };
+    `);
+  });
+
+  it("attrs as CallExpr result", () => {
+    expect(
+      testTransform(`
+      export const Component = {
+        onmatch,
+        render({ attrs }) {
+          return m(Comp2, getAttrs(attrs));
+        },
+      };
+    `)
+    ).toMatchInlineSnapshot(`
+      export const Component = {
+        onmatch,
+
+        render({
+          attrs
+        }) {
+          return m(Comp2, getAttrs(attrs));
+        }
+
+      };
+    `);
+  });
+
+  it("attrs as CallExpr result in view prop", () => {
+    expect(
+      testTransform(`
+      export const Component = {
+        view: function ({ attrs }) {
+          return m(Comp2, getAttrs(attrs));
+        },
+      };
+    `)
+    ).toMatchInlineSnapshot(`
+      export const Component = {
+        view: function ({
+          attrs
+        }) {
+          return m(Comp2, Object.assign({
+            "data-component": "Component"
+          }, getAttrs(attrs)));
+        }
+      };
+    `);
+  });
+
+  it("attrs as CallExpr result in view prop", () => {
+    expect(
+      testTransform(`
+      export const Component = {
+        view: ({ attrs }) => {
+          return m(Comp2, getAttrs(attrs));
+        },
+      };
+    `)
+    ).toMatchInlineSnapshot(`
+      export const Component = {
+        view: ({
+          attrs
+        }) => {
+          return m(Comp2, Object.assign({
+            "data-component": "Component"
+          }, getAttrs(attrs)));
         }
       };
     `);

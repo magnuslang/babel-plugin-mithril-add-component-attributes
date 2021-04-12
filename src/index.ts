@@ -41,7 +41,7 @@ export default function babelPluginMithrilComponentDataAttrs({ types: t }: Types
     return t.objectProperty(t.stringLiteral(DATA_ATTRIBUTE), t.stringLiteral(name));
   }
 
-  function nameForAnnonCallExpression(path: NodePath, file: FileOpts) {
+  function nameForAnonCallExpression(path: NodePath, file: FileOpts) {
     // try to get a named function parent
     let p = path;
 
@@ -140,6 +140,7 @@ export default function babelPluginMithrilComponentDataAttrs({ types: t }: Types
       const props = path.get("key");
 
       if (!(props.isIdentifier() && props.node.name === "view")) {
+        path.skip();
         return;
       }
 
@@ -174,25 +175,9 @@ export default function babelPluginMithrilComponentDataAttrs({ types: t }: Types
       addAttribute(path, {
         ...state,
         source: path,
-        name: state.name || nameForAnnonCallExpression(path, state.file),
+        name: state.name || nameForAnonCallExpression(path, state.file),
       });
       path.skip();
-    },
-    ReturnStatement(path, state) {
-      const arg = path.get("argument");
-
-      if (arg.isIdentifier()) {
-        const binding = path.scope.getBinding(arg.node.name);
-        if (binding == null) {
-          return;
-        }
-        binding.path.traverse(programVisitor, {
-          ...state,
-          source: binding.path,
-          name: `${state.name}->${arg.node.name}`,
-        });
-        return;
-      }
     },
   };
 
@@ -228,12 +213,27 @@ export default function babelPluginMithrilComponentDataAttrs({ types: t }: Types
     },
     MemberExpression: (path, state) => {
       if (!state.target) {
+        path.skip();
         return;
       }
 
       // this is so you can use 'attrs' convention when Identifier is unknown at compile-time
       if (t.isIdentifier(path.node.property) && path.node.property.name === "attrs") {
         state.target.replaceWith(merge(t.objectExpression([createObjectProperties(state.name)]), path.node));
+      }
+
+      path.stop();
+    },
+    CallExpression: (path, state) => {
+      if (!state.target) {
+        return;
+      }
+
+      // convention: assume 'getAttrs' func returns attrs
+      if (t.isIdentifier(path.node.callee) && path.node.callee.name === "getAttrs") {
+        state.target.replaceWith(merge(t.objectExpression([createObjectProperties(state.name)]), path.node));
+      } else {
+        state.target.parentPath.node.arguments.splice(1, 0, t.objectExpression([createObjectProperties(state.name)]));
       }
 
       path.stop();
@@ -258,7 +258,13 @@ export default function babelPluginMithrilComponentDataAttrs({ types: t }: Types
     const targetPath = path.get("arguments.1");
     const target = path.node.arguments[1];
 
-    if (t.isObjectExpression(target) || t.isMemberExpression(target) || t.isIdentifier(target)) {
+    target;
+    if (
+      t.isObjectExpression(target) ||
+      t.isMemberExpression(target) ||
+      t.isIdentifier(target) ||
+      t.isCallExpression(target)
+    ) {
       path.traverse(mithrilAttrVisitor, { target: targetPath, ...state });
       return;
     }
@@ -267,7 +273,10 @@ export default function babelPluginMithrilComponentDataAttrs({ types: t }: Types
     path.node.arguments.splice(1, 0, t.objectExpression([createObjectProperties(name)]));
   };
 
-  const merge = (obj: types.ObjectExpression, expr: types.Identifier | types.MemberExpression) => {
+  const merge = (
+    obj: types.ObjectExpression,
+    expr: types.Identifier | types.MemberExpression | types.CallExpression
+  ) => {
     return t.expressionStatement(
       t.callExpression(t.memberExpression(t.identifier("Object"), t.identifier("assign")), [obj, expr])
     );
