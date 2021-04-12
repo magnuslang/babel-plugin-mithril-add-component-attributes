@@ -297,26 +297,27 @@ describe("can handle class defs", () => {
       };
     `);
   });
-  //   it("uses the class name when exists", () => {
-  //     expect(
-  //       testTransform(`
-  //         class Car extends Vehicle {
-  //           view() {
-  //             return m("div");
-  //           }
-  //         }
-  //       `)
-  //     ).toMatchInlineSnapshot(`
-  //       class Car extends Vehicle {
-  //         view() {
-  //           return m("div", {
-  //             "data-component": "Car"
-  //           });
-  //         }
 
-  //       }
-  //     `);
-  //   });
+  it("uses the class name when exists", () => {
+    expect(
+      testTransform(`
+          class Car extends Vehicle {
+            view() {
+              return m("div");
+            }
+          }
+        `)
+    ).toMatchInlineSnapshot(`
+        class Car extends Vehicle {
+          view() {
+            return m("div", {
+              "data-component": "Car"
+            });
+          }
+
+        }
+      `);
+  });
 });
 
 describe("uses filename as fallback", () => {
@@ -790,7 +791,7 @@ describe("attrs and spread operators", () => {
     `);
   });
 
-  it("attrs as CallExpr result in view prop", () => {
+  it("attrs as CallExpr result in view prop Func", () => {
     expect(
       testTransform(`
       export const Component = {
@@ -812,7 +813,7 @@ describe("attrs and spread operators", () => {
     `);
   });
 
-  it("attrs as CallExpr result in view prop", () => {
+  it("attrs as CallExpr result in view prop ArrowExpr", () => {
     expect(
       testTransform(`
       export const Component = {
@@ -830,6 +831,42 @@ describe("attrs and spread operators", () => {
             "data-component": "Component"
           }, getAttrs(attrs)));
         }
+      };
+    `);
+  });
+
+  it("only process CallExpr 2nd arg CallExpr 1 level deep", () => {
+    expect(
+      testTransform(`
+      const MyComponent = {
+        view(vnode) {
+          const {str, ...attrs } = vnode.attrs;
+      
+          return m(
+            "div",
+            {
+              class: getClasses(),
+              ...attrs,
+            },
+            m.trust(str)
+          );
+        },
+      };
+    `)
+    ).toMatchInlineSnapshot(`
+      const MyComponent = {
+        view(vnode) {
+          const {
+            str,
+            ...attrs
+          } = vnode.attrs;
+          return m("div", {
+            class: getClasses(),
+            ...attrs,
+            "data-component": "MyComponent"
+          }, m.trust(str));
+        }
+
       };
     `);
   });

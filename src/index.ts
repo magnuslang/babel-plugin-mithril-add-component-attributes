@@ -225,7 +225,7 @@ export default function babelPluginMithrilComponentDataAttrs({ types: t }: Types
       path.stop();
     },
     CallExpression: (path, state) => {
-      if (!state.target) {
+      if (state.target !== path) {
         return;
       }
 
@@ -258,7 +258,6 @@ export default function babelPluginMithrilComponentDataAttrs({ types: t }: Types
     const targetPath = path.get("arguments.1");
     const target = path.node.arguments[1];
 
-    target;
     if (
       t.isObjectExpression(target) ||
       t.isMemberExpression(target) ||
