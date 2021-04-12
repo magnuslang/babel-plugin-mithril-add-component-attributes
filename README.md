@@ -1,45 +1,46 @@
 # babel-plugin-mithril-add-data-attribute
 
-BETA. This plugin adds a `data-component` attribute to top-level DOM elements rendered by mithril component function `m`. Intended for development - bloats HTML. Helps debug - find your components in a large repo from generated HTML. Adds component name and file to component data attributes which will be visible in the generated HTML.
+This plugin adds a `data-component` attribute to top-level DOM elements rendered by mithril component function `m`. Intended for development - bloats HTML. Helps debug: find your components in a large repo from generated HTML. Adds component name or file name to component data attributes which will be visible in the generated HTML.
 
-- only adds to outer component
-- tries to figure out component name from function or variable def
+- tries to figure out component name from function, class or variable def
 - if no name found it tries to use the file name, so you'll know where to start
+- when not resolvable: assumes `attrs` to be an object and `getAttrs` to be a function returning an `attrs` object
 
-Needs more tests and better support for class-declarations.
+Needs more tests and better support, feel free to add issues with failing test code or commit a PR.
+Written in TypeScript.
 
 ## Examples
 
 **In**
 
 ```js
-const MyComponent = () => m("div");
+const Comp2 = () => m("div");
 
-const InnerComp = {};
-const OuterComp = () => {
-  return m("div", m(InnerComp));
+const MyComponent = () => {
+  return m("div", m(Comp2));
 };
 ```
 
 **Out**
 
 ```js
-const MyComponent = () =>
+const Comp2 = () =>
   m("div", {
-    "data-component": "MyComponent",
+    "data-component": "Comp2",
   });
 
-const InnerComp = {};
-const OuterComp = () => {
+const MyComponent = () => {
   return m(
     "div",
     {
-      "data-component": "OuterComp",
+      "data-component": "MyComponent",
     },
-    m(InnerComp)
+    m(Comp2)
   );
 };
 ```
+
+For many more examples se `test/index.test.js`
 
 ## Installation
 
@@ -79,8 +80,8 @@ require("babel-core").transform("code", {
 
 ## Options
 
-Under development
+Under development. Requests?
 
 ## Contribute
 
-Please do.
+Please do. Add an issue or PR.

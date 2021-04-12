@@ -1,6 +1,6 @@
 {
   "name": "babel-plugin-mithril-add-data-attribute",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Babel plugin adds attributes to m() components - intended for development. Helps debug - find your components in a large repo. Adds component name and file to component data attributes which will be visible in the generated HTML.",
   "main": "index.js",
   "author": "Magnus Lång <magnuslang@gmail.com>",
@@ -18,6 +18,15 @@
     "README.md",
     "index.js",
     "lib"
+  ],
+  "keywords": [
+    "babel",
+    "plugin",
+    "babel-plugin",
+    "mithril",
+    "data",
+    "component",
+    "attributes"
   ],
   "jest": {
     "testRegex": "[\\w+]\\.test\\.ts$"
